@@ -1,6 +1,7 @@
-use std::prelude::v1::*;
-use std::mem::{size_of, align_of};
 use alloc::allocator::Layout;
+use hole::Hole;
+use std::mem::{align_of, size_of};
+use std::prelude::v1::*;
 use super::*;
 
 fn new_heap() -> Heap {
@@ -8,8 +9,8 @@ fn new_heap() -> Heap {
     let heap_space = Box::into_raw(Box::new([0u8; HEAP_SIZE]));
 
     let heap = unsafe { Heap::new(heap_space as usize, HEAP_SIZE) };
-    assert!(heap.bottom == heap_space as usize);
-    assert!(heap.size == HEAP_SIZE);
+    assert_eq!(heap.bottom, heap_space as usize);
+    assert_eq!(heap.size, HEAP_SIZE);
     heap
 }
 
@@ -19,8 +20,8 @@ fn new_max_heap() -> Heap {
     let heap_space = Box::into_raw(Box::new([0u8; HEAP_SIZE_MAX]));
 
     let heap = unsafe { Heap::new(heap_space as usize, HEAP_SIZE) };
-    assert!(heap.bottom == heap_space as usize);
-    assert!(heap.size == HEAP_SIZE);
+    assert_eq!(heap.bottom, heap_space as usize);
+    assert_eq!(heap.size, HEAP_SIZE);
     heap
 }
 
@@ -46,11 +47,11 @@ fn allocate_double_usize() {
     let layout = Layout::from_size_align(size, align_of::<usize>());
     let addr = heap.allocate_first_fit(layout.unwrap());
     assert!(addr.is_ok());
-    let addr = addr.unwrap() as usize;
-    assert!(addr == heap.bottom);
+    let addr = addr.unwrap().as_ptr() as usize;
+    assert_eq!(addr, heap.bottom);
     let (hole_addr, hole_size) = heap.holes.first_hole().expect("ERROR: no hole left");
-    assert!(hole_addr == heap.bottom + size);
-    assert!(hole_size == heap.size - size);
+    assert_eq!(hole_addr, heap.bottom + size);
+    assert_eq!(hole_size, heap.size - size);
 
     unsafe {
         assert_eq!((*((addr + size) as *const Hole)).size, heap.size - size);
@@ -64,7 +65,7 @@ fn allocate_and_free_double_usize() {
     let layout = Layout::from_size_align(size_of::<usize>() * 2, align_of::<usize>()).unwrap();
     let x = heap.allocate_first_fit(layout.clone()).unwrap();
     unsafe {
-        *(x as *mut (usize, usize)) = (0xdeafdeadbeafbabe, 0xdeafdeadbeafbabe);
+        *(x.cast::<(usize, usize)>().as_ptr()) = (0xdeafdeadbeafbabe, 0xdeafdeadbeafbabe);
 
         heap.deallocate(x, layout.clone());
         assert_eq!((*(heap.bottom as *const Hole)).size, heap.size);
@@ -83,11 +84,11 @@ fn deallocate_right_before() {
 
     unsafe {
         heap.deallocate(y, layout.clone());
-        assert_eq!((*(y as *const Hole)).size, layout.size());
+        assert_eq!((*(y.cast::<Hole>().as_ref())).size, layout.size());
         heap.deallocate(x, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, layout.size() * 2);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, layout.size() * 2);
         heap.deallocate(z, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, heap.size);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, heap.size);
     }
 }
 
@@ -103,11 +104,11 @@ fn deallocate_right_behind() {
 
     unsafe {
         heap.deallocate(x, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, size);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, size);
         heap.deallocate(y, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, size * 2);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, size * 2);
         heap.deallocate(z, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, heap.size);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, heap.size);
     }
 }
 
@@ -124,14 +125,14 @@ fn deallocate_middle() {
 
     unsafe {
         heap.deallocate(x, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, size);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, size);
         heap.deallocate(z, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, size);
-        assert_eq!((*(z as *const Hole)).size, size);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, size);
+        assert_eq!((*(z.cast::<Hole>().as_ref())).size, size);
         heap.deallocate(y, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, size * 3);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, size * 3);
         heap.deallocate(a, layout.clone());
-        assert_eq!((*(x as *const Hole)).size, heap.size);
+        assert_eq!((*(x.cast::<Hole>().as_ref())).size, heap.size);
     }
 }
 
@@ -167,9 +168,9 @@ fn allocate_multiple_sizes() {
 
     let x = heap.allocate_first_fit(layout_1.clone()).unwrap();
     let y = heap.allocate_first_fit(layout_2.clone()).unwrap();
-    assert_eq!(y as usize, x as usize + base_size * 2);
+    assert_eq!(y.as_ptr() as usize, x.as_ptr() as usize + base_size * 2);
     let z = heap.allocate_first_fit(layout_3.clone()).unwrap();
-    assert_eq!(z as usize % (base_size * 4), 0);
+    assert_eq!(z.as_ptr() as usize % (base_size * 4), 0);
 
     unsafe {
         heap.deallocate(x, layout_1.clone());
