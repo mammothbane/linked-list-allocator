@@ -1,4 +1,4 @@
-use alloc::allocator::Layout;
+use core::alloc::Layout;
 use hole::Hole;
 use std::mem::{align_of, size_of};
 use std::prelude::v1::*;

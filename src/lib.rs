@@ -5,15 +5,13 @@
 
 #![cfg_attr(test, feature(nonnull_cast))]
 
-extern crate alloc;
 #[cfg(feature = "use_spin")]
 extern crate spin;
 #[cfg(test)]
 #[macro_use]
 extern crate std;
 
-use alloc::allocator::{Alloc, AllocErr, Layout};
-use core::alloc::Opaque;
+use core::alloc::{Alloc, GlobalAlloc, Opaque, AllocErr, Layout};
 use core::mem;
 #[cfg(feature = "use_spin")]
 use core::ops::Deref;
@@ -186,6 +184,21 @@ unsafe impl<'a> Alloc for &'a LockedHeap {
     }
 
     fn oom(&mut self) -> ! {
+        panic!("Out of memory");
+    }
+}
+
+#[cfg(feature = "use_spin")]
+unsafe impl<'a> GlobalAlloc for &'a LockedHeap {
+    unsafe fn alloc(&self, layout: Layout) -> *mut Opaque {
+        self.0.lock().allocate_first_fit(layout).unwrap().as_ptr()
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut Opaque, layout: Layout) {
+        self.0.lock().deallocate(NonNull::new(ptr).unwrap(), layout)
+    }
+
+    fn oom(&self) -> ! {
         panic!("Out of memory");
     }
 }

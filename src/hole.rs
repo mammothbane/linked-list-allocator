@@ -1,5 +1,4 @@
-use alloc::allocator::Layout;
-use core::alloc::{AllocErr, Opaque};
+use core::alloc::{AllocErr, Opaque, Layout};
 use core::mem::size_of;
 use core::ptr::NonNull;
 use super::align_up;
